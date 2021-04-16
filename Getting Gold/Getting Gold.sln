@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29709.97
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Getting Gold", "Getting Gold\Getting Gold.csproj", "{8186F12D-45C3-44E2-968B-873612E3B0CC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8186F12D-45C3-44E2-968B-873612E3B0CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8186F12D-45C3-44E2-968B-873612E3B0CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8186F12D-45C3-44E2-968B-873612E3B0CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8186F12D-45C3-44E2-968B-873612E3B0CC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3B3AA4FB-C43B-4D7E-BDA2-F9C802B44FF0}
+	EndGlobalSection
+EndGlobal
