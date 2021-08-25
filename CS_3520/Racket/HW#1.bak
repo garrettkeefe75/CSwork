@@ -1,0 +1,8 @@
+#lang plait
+
+(define-type Tree
+    (leaf [val : Number])
+    (node [val : Number]
+          [left : Tree]
+          [right : Tree]))
+
