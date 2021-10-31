@@ -1,5 +1,0 @@
-#lang plait
-
-3rd-power : (Number -> Number)
-
-(define (3rd-power [n : Number]))()
