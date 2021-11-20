@@ -1,5 +1,7 @@
 #lang plait
 
+
+(print-only-errors #t)
 ;; Garbage collection for run-time memory
 
 (define-type Exp
@@ -34,9 +36,9 @@
   14  [if0D (tst : ExpD)
             (thn : ExpD)
             (els : ExpD)])
-  18  [box]
-  19  [unbox]
-  20  [box?]
+  18  [boxD (elem : ExpD)]
+  19  [unbox (box : ExpD)]
+  20  [box? (elem : ExpD)]
 |#
 
 #|
@@ -44,7 +46,7 @@
   15  [numV (n : number)]
   16  [closV (body : ExpD)
              (env : Env)]
-  21  [boxV (loc : number)])
+  21  [boxV (val : Value)])
 
 |#
 
@@ -77,7 +79,9 @@
   7   [doIf0K (then-expr : ExpD)
               (else-expr : ExpD)
               (env : Env)
-              (k : Cont)])
+              (k : Cont)]
+  22   [doUnboxK (k : Cont)]
+  23   [doBox?K (k: Cont)])
 |#
 
 #|
@@ -323,15 +327,25 @@
            (move! 3)
            (move! 4)
            (done 4))]
+        [(21 22 23 24)
+         (begin
+           (move! 1)
+           (done 1))]
         [else
          (error 'update "internal error: unknown tag")])))
 
 (define (done n)
   (begin
-    (set! updated-ptr-reg (+ updated-ptr-reg (+ n 1)))
-    
+    (set! updated-ptr-reg (+ updated-ptr-reg (+ n 1)))    
     (update)))
-
+(module+ test
+  (test/exn (begin
+              (malloc1 50 55)
+              (update))            
+            "")) ;;Test that covers update
+(vector-set! memory 0 0)
+(vector-set! memory 1 0)
+(set! ptr-reg 0)
 
 ;; move! : number -> void
 ;;  Updates pointer at updated-ptr+n, moving the
@@ -352,7 +366,7 @@
       ;; White:
       (begin
         (case (vector-ref from-memory n)
-          [(0 15)
+          [(0 15 21 22 23 24)
            ;; size 1
            (begin
              (malloc1 (vector-ref from-memory n)
@@ -389,6 +403,15 @@
         ;; Return forwarding porter (that we just installed):
         (vector-ref from-memory (+ n 1)))))
 
+(vector-set! memory 0 50)
+(vector-set! memory 1 52)
+(set! from-memory memory)
+
+(module+ test
+  (test/exn (move 0) "")) ;;Test to cover a failure from move
+
+(vector-set! memory 0 0)
+(vector-set! memory 1 0)
 ;; ----------------------------------------
 
 (define expr-reg 0) ; ExprC
@@ -442,18 +465,30 @@
        (interp))]
     [(18) ; box
      (begin
-       (set! v-reg (malloc1 21 (code-ref expr-reg 1)))
-       (set! expr-reg (code-ref expr-reg 2))
-       (continue))]
-    ;[(19) ; unbox
-    ; ...]
-    ;[(20) ; box?
-    ; ...]
+       (set! expr-reg (code-ref expr-reg 1))
+       (set! k-reg (malloc1 24 k-reg))
+       (interp))]
+    [(19) ; unbox
+     (begin
+       (set! expr-reg (code-ref expr-reg 1))
+       (set! k-reg (malloc1 22 k-reg))
+       (interp))]
+    [(20) ; box?
+     (begin
+       (set! k-reg (malloc1 23 k-reg))
+       (set! expr-reg (code-ref expr-reg 1))
+       (interp))]
     [else
      (error 'interp "internal error: unknown tag")]))
 
 (define k-reg 0) ; Cont
 (define v-reg 0) ; Value
+
+
+(test/exn (begin
+            (set! expr-reg 50)
+            (interp)) ;; test that cover interp error
+          "")
 
 ;; continue : Cont Value -> Value
 (define (continue)
@@ -504,8 +539,30 @@
        (set! env-reg (ref k-reg 3))
        (set! k-reg (ref k-reg 4))
        (interp))]
+    [(22) ;doUnboxK
+     (begin
+       (set! k-reg (ref k-reg 1))
+       (set! v-reg (ref v-reg 1))
+       (continue))]
+    [(23) ;doBox?K
+     (begin
+       (cond
+         [(equal? (ref v-reg 0) 21)(set! v-reg (malloc1 15 0))]
+         [else (set! v-reg (malloc1 15 1))])
+       (set! k-reg (ref k-reg 1))
+       (continue))]
+    [(24) ;doBoxK
+    (begin
+      (set! v-reg (malloc1 21 v-reg))
+      (set! k-reg (ref k-reg 1))
+      (continue))]
     [else
      (error 'continue "internal error: unknown tag")]))
+
+(test/exn (begin
+              (set! k-reg (malloc1 52 k-reg))
+              (continue))
+            "") ;; test that covers continue error
 
 ;; num-op : (number number -> number) -> (Value Value -> Value)
 (define (num-op op)
@@ -559,6 +616,7 @@
     (void)))
 
 (module+ test
+  (reset!)
   (ntest (interpx (compile (parse `10) mt-env)
                   empty-env
                   (init-k))
@@ -660,15 +718,13 @@
   (test/exn (compile (parse `x) mt-env)
             "free variable")
 ;; Box test -------------------------
-
   (reset!)
   (ntest (interpx (compile
                    (parse `{box 1})
                    mt-env)
                   empty-env
                   (init-k))
-         0)
-  #|
+         4)
   (reset!)
   (ntest (interpx (compile
                    (parse `{unbox {unbox {box {box 3}}}})
@@ -684,7 +740,7 @@
                   empty-env
                   (init-k))
          1)
-  
+   
   (reset!)
   (ntest (interpx (compile
                    (parse `{box? {box 3}})
@@ -700,6 +756,13 @@
                   empty-env
                   (init-k))
          1)
+  (reset!)
+  (ntest (interpx (compile
+                   (parse `{unbox {unbox {unbox {unbox {unbox {box {box {box {box {box 3}}}}}}}}}})
+                   mt-env)
+                  empty-env
+                  (init-k))
+         3)
   
   (reset!)
   (ntest (interpx (compile
@@ -735,5 +798,37 @@
                   empty-env
                   (init-k))
          1)
- |#
-  )
+  (reset!)
+  (ntest (interpx (compile
+                   (parse
+                    `{{lambda {mkrec}
+                        {{{lambda {chain}
+                            {lambda {unchain}
+                              ;; Make a chain of boxes, then traverse
+                              ;; them:
+                              {{unchain 1} {chain 1}}}}
+                          ;; Create recursive chain function:
+                          {mkrec
+                           {lambda {chain}
+                             {lambda {n}
+                               {if0 n
+                                    1
+                                    {box {chain {+ n -1}}}}}}}}
+                         ;; Create recursive unchain function:
+                         {mkrec
+                          {lambda {unchain}
+                            {lambda {n}
+                              {lambda {b}
+                                {if0 n
+                                     b
+                                     {unbox {{unchain {+ n -1}} b}}}}}}}}}
+                      ;; mkrec:
+                      {lambda {body-proc}
+                        {{lambda {fX}
+                           {fX fX}}
+                         {lambda {fX}
+                           {body-proc {lambda {x} {{fX fX} x}}}}}}})
+                   mt-env)
+                  empty-env
+                  (init-k))
+         1))
